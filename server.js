@@ -588,6 +588,8 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
   const twilioFrom = req.body.From;
   const content = req.body.Body;
   
+  console.log(`[Twilio Webhook] Nhận tin nhắn mới: From=${twilioFrom}, Body="${content}"`);
+
   if (!twilioFrom || !content) {
     return res.status(400).send('Invalid request');
   }
