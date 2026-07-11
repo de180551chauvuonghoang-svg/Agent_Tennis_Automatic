@@ -412,9 +412,17 @@ function setupOCRHandlers() {
       document.getElementById('ocr-country-code').value = ocrCountryCode;
       document.getElementById('ocr-phone-body').value = ocrPhoneBody;
       document.getElementById('ocr-name').value = leadData.name || '';
-      document.getElementById('ocr-platform').value = leadData.platform || 'Zalo';
+      
+      // Bắt buộc HLV phải tự chọn Zalo hoặc WhatsApp nếu là số Việt Nam
+      let detectedPlatform = leadData.platform || 'Zalo';
+      if (ocrCountryCode === '+84' || ocrPhoneBody.startsWith('0')) {
+        detectedPlatform = '';
+      } else {
+        detectedPlatform = 'WhatsApp';
+      }
+      document.getElementById('ocr-platform').value = detectedPlatform;
       document.getElementById('ocr-notes').value = leadData.notes || '';
-      // Cập nhật hiển thị ngôn ngữ theo platform vừa nhận
+      
       updateLanguageVisibility();
 
       // Xử lý nếu trùng SĐT
@@ -491,6 +499,10 @@ function setupOCRHandlers() {
       alert('Vui lòng nhập mã quốc gia đúng định dạng (ví dụ: +84, +86, +1).');
       return;
     }
+    if (!platform) {
+      alert('Vui lòng chọn nền tảng kết nối (Zalo hoặc WhatsApp) cho khách hàng.');
+      return;
+    }
 
     try {
       // 1. Tạo Lead mới (lưu số thô, bỏ khoảng trắng format)
@@ -498,7 +510,16 @@ function setupOCRHandlers() {
       const saveResponse = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...leadData, phone: rawPhone, name, platform, notes, language })
+        body: JSON.stringify({ 
+          ...leadData, 
+          phone: rawPhone, 
+          countryCode: countryCode, 
+          phoneBody: phoneBody, 
+          name, 
+          platform, 
+          notes, 
+          language 
+        })
       });
       const saveResult = await saveResponse.json();
       if (!saveResponse.ok) throw new Error(saveResult.error);
