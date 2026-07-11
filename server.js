@@ -8,6 +8,7 @@ const geminiService = require('./services/gemini');
 const zaloService = require('./services/zalo');
 const whatsappService = require('./services/whatsapp');
 const googleService = require('./services/google');
+const dbService = require('./services/db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,19 +38,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
-
-// Helper đọc/ghi Database JSON
-const dbPath = path.join(__dirname, 'database.json');
-function readDB() {
-  try {
-    return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-  } catch (error) {
-    return { leads: [] };
-  }
-}
-function writeDB(data) {
-  fs.writeFileSync(dbPath, JSON.stringify(data, null, 2), 'utf8');
-}
 
 // Helper đọc/ghi Config JSON
 const configPath = path.join(__dirname, 'config.json');
@@ -125,9 +113,13 @@ app.post('/api/config/upload-banner-vi', upload.single('banner'), (req, res) => 
 });
 
 // 2. Quản lý Khách hàng (Leads)
-app.get('/api/leads', (req, res) => {
-  const db = readDB();
-  res.json(db.leads);
+app.get('/api/leads', async (req, res) => {
+  try {
+    const leads = await dbService.getLeads();
+    res.json(leads);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Upload ảnh chụp màn hình để OCR khách hàng mới
@@ -146,10 +138,9 @@ app.post('/api/leads/upload', upload.single('screenshot'), async (req, res) => {
     // Xử lý cả 2 format: mới (countryCode + phoneBody) và cũ (phone)
     let rawPhone;
     if (ocrData.countryCode && ocrData.phoneBody) {
-      // Format mới: ghép countryCode + phoneBody
-      const cc = ocrData.countryCode.trim(); // ví dụ: '+86'
-      const pb = ocrData.phoneBody.replace(/\s/g, ''); // ví dụ: '13824301352'
-      rawPhone = cc + pb; // '+8613824301352'
+      const cc = ocrData.countryCode.trim();
+      const pb = ocrData.phoneBody.replace(/\s/g, '');
+      rawPhone = cc + pb;
     } else {
       rawPhone = ocrData.phone || '';
     }
@@ -187,8 +178,8 @@ app.post('/api/leads/upload', upload.single('screenshot'), async (req, res) => {
     };
 
     // Kiểm tra xem số điện thoại đã tồn tại chưa
-    const db = readDB();
-    const existing = db.leads.find(l => l.phone === newLead.phone && newLead.phone !== '');
+    const leads = await dbService.getLeads();
+    const existing = leads.find(l => l.phone === newLead.phone && newLead.phone !== '');
     if (existing) {
       return res.json({
         success: true,
@@ -206,45 +197,29 @@ app.post('/api/leads/upload', upload.single('screenshot'), async (req, res) => {
 });
 
 // Lưu khách hàng mới vào Database
-app.post('/api/leads', (req, res) => {
-  const db = readDB();
+app.post('/api/leads', async (req, res) => {
   const leadData = req.body;
   
   if (!leadData.phone) {
     return res.status(400).json({ error: 'Số điện thoại là bắt buộc' });
   }
 
-  // Check trùng sđt lần nữa
-  const existing = db.leads.find(l => l.phone === leadData.phone);
-  if (existing) {
-    return res.status(400).json({ error: 'Số điện thoại đã tồn tại trong hệ thống' });
+  try {
+    const newLead = await dbService.createLead(leadData);
+    res.json({ success: true, lead: newLead });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
-
-  const newLead = {
-    ...leadData,
-    id: leadData.id || 'lead_' + Date.now(),
-    status: 'New',
-    messages: leadData.messages || [],
-    createdAt: leadData.createdAt || new Date().toISOString()
-  };
-
-  db.leads.unshift(newLead);
-  writeDB(db);
-  res.json({ success: true, lead: newLead });
 });
 
 // Xóa khách hàng
-app.delete('/api/leads/:id', (req, res) => {
-  const db = readDB();
-  const initialLength = db.leads.length;
-  db.leads = db.leads.filter(l => l.id !== req.params.id);
-  
-  if (db.leads.length === initialLength) {
-    return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
+app.delete('/api/leads/:id', async (req, res) => {
+  try {
+    await dbService.deleteLead(req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(404).json({ error: error.message });
   }
-  
-  writeDB(db);
-  res.json({ success: true });
 });
 
 // 3. Quản lý hội thoại và AI Chatbot
@@ -252,14 +227,13 @@ app.delete('/api/leads/:id', (req, res) => {
 // Gửi tin nhắn chào mừng & bắt đầu chat
 app.post('/api/leads/start-chat', async (req, res) => {
   const { id, language } = req.body;
-  const db = readDB();
-  const leadIndex = db.leads.findIndex(l => l.id === id);
+  const leads = await dbService.getLeads();
+  const lead = leads.find(l => l.id === id);
 
-  if (leadIndex === -1) {
+  if (!lead) {
     return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
   }
 
-  const lead = db.leads[leadIndex];
   const config = readConfig();
 
   // Tạo nội dung tin nhắn chào theo template ngôn ngữ
@@ -268,9 +242,7 @@ app.post('/api/leads/start-chat', async (req, res) => {
   if (effectiveLang === 'vi') {
     greetingTemplate = config.greeting_template || '';
   } else {
-    // Tiếng Anh hoặc ngôn ngữ quốc tế khác
     greetingTemplate = config.greeting_template_en || '';
-    // Nếu chưa cấu hình template tiếng Anh, tự sinh greeting tiếng Anh mặc định
     if (!greetingTemplate) {
       greetingTemplate = `Hello {{name}}, I am the AI Assistant of Coach {{coach_name}}. Our partner has shared your contact information with us. Could you let us know what level of tennis you are interested in (beginner or advanced), and which area you would prefer for training?`;
     }
@@ -287,45 +259,53 @@ app.post('/api/leads/start-chat', async (req, res) => {
     content: greeting,
     timestamp: new Date().toISOString()
   };
-  // Lưu ngôn ngữ vào lead (dùng cho chatbot sau này)
-  if (language) lead.language = language;
-  lead.messages.push(greetingMsg);
-  lead.status = 'Chatting';
 
-  db.leads[leadIndex] = lead;
-  writeDB(db);
+  const updates = {
+    status: 'Chatting'
+  };
+  if (language) updates.language = language;
 
-  // 2. Gửi tin nhắn thật thông qua API (hoặc giả lập)
-  let link = '';
-  let sendResult = { success: true };
-  if (lead.platform === 'Zalo') {
-    link = zaloService.getZaloLink(lead.phone);
-    sendResult = await zaloService.sendZaloMessage(lead.phone, greeting);
-  } else {
-    link = whatsappService.getWhatsAppLink(lead.phone, greeting);
-    sendResult = await whatsappService.sendWhatsAppMessage(lead.phone, greeting);
+  // Xóa câu gợi ý (nếu có) khi bắt đầu chat tự động
+  updates.suggestedReply = null;
+
+  try {
+    await dbService.updateLead(id, updates);
+    await dbService.addMessage(id, greetingMsg);
+
+    // 2. Gửi tin nhắn thật thông qua API (hoặc giả lập)
+    let link = '';
+    let sendResult = { success: true };
+    if (lead.platform === 'Zalo') {
+      link = zaloService.getZaloLink(lead.phone);
+      sendResult = await zaloService.sendZaloMessage(lead.phone, greeting);
+    } else {
+      link = whatsappService.getWhatsAppLink(lead.phone, greeting);
+      sendResult = await whatsappService.sendWhatsAppMessage(lead.phone, greeting);
+    }
+
+    const updatedLeads = await dbService.getLeads();
+    res.json({ 
+      success: true, 
+      lead: updatedLeads.find(l => l.id === id), 
+      chatLink: link,
+      apiSent: !sendResult.simulated,
+      apiError: sendResult.error || null
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  res.json({ 
-    success: true, 
-    lead, 
-    chatLink: link,
-    apiSent: !sendResult.simulated,
-    apiError: sendResult.error || null
-  });
 });
 
 // Nhận tin nhắn thủ công từ HLV gửi đi từ Dashboard
 app.post('/api/chat/send-manual', async (req, res) => {
   const { leadId, content } = req.body;
-  const db = readDB();
-  const leadIndex = db.leads.findIndex(l => l.id === leadId);
+  const leads = await dbService.getLeads();
+  const lead = leads.find(l => l.id === leadId);
 
-  if (leadIndex === -1) {
+  if (!lead) {
     return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
   }
 
-  const lead = db.leads[leadIndex];
   const manualMsg = {
     id: 'msg_' + Date.now(),
     sender: 'model',
@@ -333,32 +313,35 @@ app.post('/api/chat/send-manual', async (req, res) => {
     timestamp: new Date().toISOString()
   };
 
-  lead.messages.push(manualMsg);
-  db.leads[leadIndex] = lead;
-  writeDB(db);
+  try {
+    await dbService.addMessage(leadId, manualMsg);
+    // Xóa câu gợi ý AI cũ khi HLV đã phản hồi thủ công
+    await dbService.updateLead(leadId, { suggestedReply: null });
 
-  // Gửi tin nhắn đi qua API nếu có kết nối
-  if (lead.platform === 'Zalo') {
-    await zaloService.sendZaloMessage(lead.phone, content);
-  } else {
-    await whatsappService.sendWhatsAppMessage(lead.phone, content);
+    // Gửi tin nhắn đi qua API nếu có kết nối
+    if (lead.platform === 'Zalo') {
+      await zaloService.sendZaloMessage(lead.phone, content);
+    } else {
+      await whatsappService.sendWhatsAppMessage(lead.phone, content);
+    }
+
+    const updatedLeads = await dbService.getLeads();
+    res.json({ success: true, messages: updatedLeads.find(l => l.id === leadId).messages });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
-
-  res.json({ success: true, messages: lead.messages });
 });
 
 // Mô phỏng tin nhắn từ khách gửi đến (dùng để Test hệ thống)
 app.post('/api/chat/simulate-message', async (req, res) => {
   const { leadId, content } = req.body;
-  const db = readDB();
-  const leadIndex = db.leads.findIndex(l => l.id === leadId);
+  const leads = await dbService.getLeads();
+  const lead = leads.find(l => l.id === leadId);
 
-  if (leadIndex === -1) {
+  if (!lead) {
     return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
   }
 
-  const lead = db.leads[leadIndex];
-  
   // 1. Thêm tin nhắn của Khách (user)
   const userMsg = {
     id: 'msg_user_' + Date.now(),
@@ -378,24 +361,44 @@ app.post('/api/chat/simulate-message', async (req, res) => {
       console.error('Lỗi khi dịch tin nhắn mô phỏng:', e);
     }
   }
-  lead.messages.push(userMsg);
-
-  // Nếu trạng thái không phải Chatting, AI không tự trả lời (hoặc đang chờ HLV chốt lịch)
-  if (lead.status !== 'Chatting') {
-    db.leads[leadIndex] = lead;
-    writeDB(db);
-    return res.json({ success: true, lead, replySimulated: false });
-  }
 
   try {
-    // Định dạng lịch sử trò chuyện cho Gemini: [{role: 'user'|'model', content: '...'}]
-    const chatHistory = lead.messages.map(m => ({
+    await dbService.addMessage(leadId, userMsg);
+
+    // Tải lại lead sau khi thêm tin nhắn
+    let updatedLeads = await dbService.getLeads();
+    let updatedLead = updatedLeads.find(l => l.id === leadId);
+
+    // Nếu trạng thái không phải Chatting (AI tự trả lời đã tắt hoặc chờ chốt lịch)
+    if (updatedLead.status !== 'Chatting') {
+      try {
+        const chatHistory = updatedLead.messages.map(m => ({
+          role: m.sender === 'user' ? 'user' : 'model',
+          content: m.content
+        }));
+        const aiResponse = await geminiService.runChatbot(chatHistory, updatedLead.language || 'vi');
+        const suggestedReply = {
+          content: aiResponse.reply,
+          send_price_banner: aiResponse.send_price_banner || false,
+          trigger_coach_booking: aiResponse.trigger_coach_booking || false,
+          timestamp: new Date().toISOString()
+        };
+        await dbService.updateLead(leadId, { suggestedReply });
+      } catch (error) {
+        console.error('Lỗi sinh đề xuất trả lời AI:', error);
+      }
+
+      const finalLeads = await dbService.getLeads();
+      return res.json({ success: true, lead: finalLeads.find(l => l.id === leadId), replySimulated: false });
+    }
+
+    // 2. Chạy Chatbot AI Gemini khi đang ở trạng thái Chatting tự động
+    const chatHistory = updatedLead.messages.map(m => ({
       role: m.sender === 'user' ? 'user' : 'model',
       content: m.content
     }));
 
-    // 2. Chạy Chatbot AI Gemini (truyền ngôn ngữ của lead)
-    const aiResponse = await geminiService.runChatbot(chatHistory, lead.language || 'vi');
+    const aiResponse = await geminiService.runChatbot(chatHistory, updatedLead.language || 'vi');
 
     // 3. Thêm tin nhắn trả lời của AI (model)
     const aiMsg = {
@@ -404,14 +407,13 @@ app.post('/api/chat/simulate-message', async (req, res) => {
       content: aiResponse.reply,
       timestamp: new Date().toISOString()
     };
-    lead.messages.push(aiMsg);
+    await dbService.addMessage(leadId, aiMsg);
 
     // 4. Nếu AI yêu cầu gửi banner báo giá
     let bannerSent = false;
     if (aiResponse.send_price_banner) {
       const config = readConfig();
-      const leadLang = lead.language || 'vi';
-      // Chọn banner theo ngôn ngữ: VI → banner tiếng Việt, EN/khác → banner quốc tế
+      const leadLang = updatedLead.language || 'vi';
       const bannerPath = leadLang === 'vi'
         ? (config.price_banner_path_vi || config.price_banner_path || '/uploads/pricing_banner.png')
         : (config.price_banner_path || '/uploads/pricing_banner.png');
@@ -423,36 +425,34 @@ app.post('/api/chat/simulate-message', async (req, res) => {
         mediaUrl: bannerPath,
         timestamp: new Date().toISOString()
       };
-      lead.messages.push(bannerMsg);
+      await dbService.addMessage(leadId, bannerMsg);
       bannerSent = true;
 
       // Gửi banner qua API nếu được thiết lập
       const fullBannerUrl = req.protocol + '://' + req.get('host') + bannerPath;
-      if (lead.platform === 'Zalo') {
-        await zaloService.sendZaloMessage(lead.phone, "Ảnh báo giá đính kèm", fullBannerUrl);
+      if (updatedLead.platform === 'Zalo') {
+        await zaloService.sendZaloMessage(updatedLead.phone, "Ảnh báo giá đính kèm", fullBannerUrl);
       } else {
-        await whatsappService.sendWhatsAppMessage(lead.phone, "Ảnh báo giá đính kèm", fullBannerUrl);
+        await whatsappService.sendWhatsAppMessage(updatedLead.phone, "Ảnh báo giá đính kèm", fullBannerUrl);
       }
     }
 
     // 5. Nếu AI phát hiện mong muốn đặt lịch học
     if (aiResponse.trigger_coach_booking) {
-      lead.status = 'Awaiting Booking';
+      await dbService.updateLead(leadId, { status: 'Awaiting Booking' });
     }
-
-    db.leads[leadIndex] = lead;
-    writeDB(db);
 
     // Gửi phản hồi chính của AI qua API thực tế nếu có cấu hình
-    if (lead.platform === 'Zalo') {
-      await zaloService.sendZaloMessage(lead.phone, aiResponse.reply);
+    if (updatedLead.platform === 'Zalo') {
+      await zaloService.sendZaloMessage(updatedLead.phone, aiResponse.reply);
     } else {
-      await whatsappService.sendWhatsAppMessage(lead.phone, aiResponse.reply);
+      await whatsappService.sendWhatsAppMessage(updatedLead.phone, aiResponse.reply);
     }
 
+    const finalLeads = await dbService.getLeads();
     res.json({ 
       success: true, 
-      lead, 
+      lead: finalLeads.find(l => l.id === leadId), 
       replySimulated: true, 
       aiResponse,
       bannerSent
@@ -466,17 +466,15 @@ app.post('/api/chat/simulate-message', async (req, res) => {
 // 4. Xác nhận chốt lịch & đồng bộ Calendar / CRM
 app.post('/api/leads/confirm-booking', async (req, res) => {
   const { leadId, date, time, durationMinutes, notes } = req.body;
-  const db = readDB();
-  const leadIndex = db.leads.findIndex(l => l.id === leadId);
+  const leads = await dbService.getLeads();
+  const lead = leads.find(l => l.id === leadId);
 
-  if (leadIndex === -1) {
+  if (!lead) {
     return res.status(404).json({ error: 'Không tìm thấy khách hàng' });
   }
-
-  const lead = db.leads[leadIndex];
   
   try {
-    // 1. Tạo sự kiện Google Calendar
+    // 1. Tạo sự kiện Google Calendar (với múi giờ Việt Nam an toàn +07:00)
     const calendarResult = await googleService.createCalendarEvent({
       clientName: lead.name || 'Khách hàng',
       phone: lead.phone,
@@ -496,31 +494,36 @@ app.post('/api/leads/confirm-booking', async (req, res) => {
       bookingTime: time
     });
 
-    // 3. Cập nhật trạng thái khách hàng thành Booked
-    lead.status = 'Booked';
-    lead.bookingDetails = {
+    const bookingDetails = {
       date,
       time,
       durationMinutes,
       notes,
       calendarLink: calendarResult.eventLink || null,
-      syncedCRM: crmResult.success && !crmResult.simulated
+      syncedCRM: crmResult.success && !crmResult.simulated,
+      discordNotified: false
     };
 
+    // 3. Cập nhật trạng thái khách hàng thành Booked và xóa gợi ý cũ
+    await dbService.updateLead(leadId, {
+      status: 'Booked',
+      bookingDetails,
+      suggestedReply: null
+    });
+
     // Thêm tin nhắn hệ thống thông báo chốt lịch thành công
-    lead.messages.push({
+    const systemMsg = {
       id: 'msg_sys_' + Date.now(),
       sender: 'system',
       content: `Lịch học đã được chốt: ngày ${date} lúc ${time} (${durationMinutes} phút). Đã đồng bộ Google Calendar & CRM.`,
       timestamp: new Date().toISOString()
-    });
+    };
+    await dbService.addMessage(leadId, systemMsg);
 
-    db.leads[leadIndex] = lead;
-    writeDB(db);
-
+    const finalLeads = await dbService.getLeads();
     res.json({ 
       success: true, 
-      lead,
+      lead: finalLeads.find(l => l.id === leadId),
       calendarSynced: !calendarResult.simulated,
       crmSynced: !crmResult.simulated
     });
@@ -532,26 +535,22 @@ app.post('/api/leads/confirm-booking', async (req, res) => {
 
 // Webhook tiếp nhận tin nhắn từ WhatsApp Twilio
 app.post('/api/webhooks/whatsapp', async (req, res) => {
-  const twilioFrom = req.body.From; // ví dụ: "whatsapp:+8613824301352"
-  const content = req.body.Body;     // ví dụ: "Hello, what are the fees?"
+  const twilioFrom = req.body.From;
+  const content = req.body.Body;
   
   if (!twilioFrom || !content) {
     return res.status(400).send('Invalid request');
   }
 
-  // Loại bỏ tiền tố "whatsapp:" nếu có
   const rawPhone = twilioFrom.replace('whatsapp:', '');
   const { phone } = normalizePhoneNumber(rawPhone);
 
-  const db = readDB();
-  let leadIndex = db.leads.findIndex(l => l.phone === phone);
-  let lead;
+  const leads = await dbService.getLeads();
+  let lead = leads.find(l => l.phone === phone);
 
-  if (leadIndex === -1) {
+  if (!lead) {
     // Tạo lead mới tự động nếu chưa có
     const id = 'lead_' + Date.now();
-    
-    // Tách mã quốc gia và phần thân số điện thoại
     let finalCountryCode = '';
     let finalPhoneBody = '';
     const clean = phone.replace(/[\s\-\.]/g, '');
@@ -564,7 +563,7 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
       finalCountryCode = '+84'; finalPhoneBody = clean;
     }
 
-    lead = {
+    const newLeadData = {
       id,
       phone,
       countryCode: finalCountryCode,
@@ -573,18 +572,14 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
       notes: 'Tự động tạo từ tin nhắn WhatsApp mới',
       platform: 'WhatsApp',
       screenshotPath: '',
-      status: 'Chatting', // mặc định cho AI tự trả lời luôn
-      language: 'en', // default to English for new WhatsApp international leads
-      messages: [],
-      createdAt: new Date().toISOString()
+      status: 'Chatting',
+      language: 'en',
+      messages: []
     };
-    db.leads.push(lead);
-    leadIndex = db.leads.length - 1;
-  } else {
-    lead = db.leads[leadIndex];
+    
+    lead = await dbService.createLead(newLeadData);
   }
 
-  // 1. Thêm tin nhắn của Khách (user)
   const userMsg = {
     id: 'msg_user_' + Date.now(),
     sender: 'user',
@@ -592,7 +587,7 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
     timestamp: new Date().toISOString()
   };
 
-  // Dịch từ tiếng Anh sang tiếng Việt nếu lead dùng tiếng Anh/quốc tế
+  // Dịch sang tiếng Việt nếu cần
   if (lead.language && lead.language !== 'vi') {
     try {
       const translation = await geminiService.translateToVietnamese(content);
@@ -603,33 +598,35 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
       console.error('Lỗi khi dịch webhook WhatsApp:', e);
     }
   }
-  lead.messages.push(userMsg);
 
-  // Nếu đang bật tự động trả lời bằng AI (Chatting)
-  if (lead.status === 'Chatting') {
-    try {
-      // Định dạng lịch sử trò chuyện
-      const chatHistory = lead.messages.map(m => ({
+  try {
+    await dbService.addMessage(lead.id, userMsg);
+
+    // Tải lại lead với tin nhắn mới nhất
+    const updatedLeads = await dbService.getLeads();
+    const updatedLead = updatedLeads.find(l => l.id === lead.id);
+
+    // Nếu đang bật tự động trả lời bằng AI (Chatting)
+    if (updatedLead.status === 'Chatting') {
+      const chatHistory = updatedLead.messages.map(m => ({
         role: m.sender === 'user' ? 'user' : 'model',
         content: m.content
       }));
 
-      // Chạy Chatbot AI
-      const aiResponse = await geminiService.runChatbot(chatHistory, lead.language || 'vi');
+      const aiResponse = await geminiService.runChatbot(chatHistory, updatedLead.language || 'vi');
 
-      // Thêm phản hồi của AI
       const aiMsg = {
         id: 'msg_model_' + Date.now(),
         sender: 'model',
         content: aiResponse.reply,
         timestamp: new Date().toISOString()
       };
-      lead.messages.push(aiMsg);
+      await dbService.addMessage(updatedLead.id, aiMsg);
 
       // Gửi banner báo giá nếu cần
       if (aiResponse.send_price_banner) {
         const config = readConfig();
-        const leadLang = lead.language || 'vi';
+        const leadLang = updatedLead.language || 'vi';
         const bannerPath = leadLang === 'vi'
           ? (config.price_banner_path_vi || config.price_banner_path || '/uploads/pricing_banner.png')
           : (config.price_banner_path || '/uploads/pricing_banner.png');
@@ -641,30 +638,36 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
           mediaUrl: bannerPath,
           timestamp: new Date().toISOString()
         };
-        lead.messages.push(bannerMsg);
+        await dbService.addMessage(updatedLead.id, bannerMsg);
 
-        // Gửi qua Twilio
         const fullBannerUrl = req.protocol + '://' + req.get('host') + bannerPath;
-        await whatsappService.sendWhatsAppMessage(lead.phone, "Ảnh báo giá đính kèm", fullBannerUrl);
+        await whatsappService.sendWhatsAppMessage(updatedLead.phone, "Ảnh báo giá đính kèm", fullBannerUrl);
       }
 
-      // Đổi trạng thái nếu đặt lịch
       if (aiResponse.trigger_coach_booking) {
-        lead.status = 'Awaiting Booking';
+        await dbService.updateLead(updatedLead.id, { status: 'Awaiting Booking' });
       }
 
-      // Gửi câu trả lời của AI đến khách qua Twilio
-      await whatsappService.sendWhatsAppMessage(lead.phone, aiResponse.reply);
-
-    } catch (error) {
-      console.error('Lỗi tự động trả lời webhook:', error);
+      await whatsappService.sendWhatsAppMessage(updatedLead.phone, aiResponse.reply);
+    } else {
+      // AI Tự trả lời đang tắt -> Sinh câu đề xuất gợi ý cho HLV
+      const chatHistory = updatedLead.messages.map(m => ({
+        role: m.sender === 'user' ? 'user' : 'model',
+        content: m.content
+      }));
+      const aiResponse = await geminiService.runChatbot(chatHistory, updatedLead.language || 'vi');
+      const suggestedReply = {
+        content: aiResponse.reply,
+        send_price_banner: aiResponse.send_price_banner || false,
+        trigger_coach_booking: aiResponse.trigger_coach_booking || false,
+        timestamp: new Date().toISOString()
+      };
+      await dbService.updateLead(updatedLead.id, { suggestedReply });
     }
+  } catch (error) {
+    console.error('Lỗi khi xử lý webhook tin nhắn WhatsApp:', error);
   }
 
-  db.leads[leadIndex] = lead;
-  writeDB(db);
-
-  // Phản hồi Twilio XML trống để tránh gửi tin nhắn rác
   res.type('text/xml').send('<Response></Response>');
 });
 
@@ -784,44 +787,39 @@ function startDiscordNotificationScheduler() {
   console.log('[Discord] Đã kích hoạt tiến trình quét lịch dạy nhắc nhở (chu kỳ 60s)...');
   setInterval(async () => {
     try {
-      const db = readDB();
+      const leads = await dbService.getLeads();
       const config = readConfig();
       const webhookUrl = config.discord_webhook_url;
 
       if (!webhookUrl) {
-        return; // Bỏ qua nếu chưa cấu hình Discord Webhook
+        return;
       }
 
-      let dbChanged = false;
       const now = new Date();
 
-      for (let i = 0; i < db.leads.length; i++) {
-        const lead = db.leads[i];
+      for (let i = 0; i < leads.length; i++) {
+        const lead = leads[i];
         if (lead.status === 'Booked' && lead.bookingDetails && lead.bookingDetails.date && lead.bookingDetails.time) {
-          // Bỏ qua nếu đã gửi thông báo rồi
           if (lead.bookingDetails.discordNotified) {
             continue;
           }
 
-          // Phân tích thời gian bắt đầu học theo giờ Việt Nam
           const startDateTime = new Date(`${lead.bookingDetails.date}T${lead.bookingDetails.time}:00+07:00`);
           const timeDiffMs = startDateTime.getTime() - now.getTime();
           const timeDiffMins = timeDiffMs / (1000 * 60);
 
-          // Gửi thông báo nếu thời gian bắt đầu trong vòng 15 phút tới và chưa quá muộn (trong vòng 30 phút qua)
           if (timeDiffMins <= 15 && timeDiffMins > -30) {
             console.log(`[Discord] Phát hiện lịch dạy sắp diễn ra của ${lead.name} (${lead.phone}) lúc ${lead.bookingDetails.time}. Đang gửi thông báo...`);
             const success = await sendDiscordWebhook(webhookUrl, lead, startDateTime);
             if (success) {
-              lead.bookingDetails.discordNotified = true;
-              dbChanged = true;
+              const updatedBookingDetails = {
+                ...lead.bookingDetails,
+                discordNotified: true
+              };
+              await dbService.updateLead(lead.id, { bookingDetails: updatedBookingDetails });
             }
           }
         }
-      }
-
-      if (dbChanged) {
-        writeDB(db);
       }
     } catch (error) {
       console.error('[Discord] Gặp lỗi khi chạy trình lập lịch:', error);

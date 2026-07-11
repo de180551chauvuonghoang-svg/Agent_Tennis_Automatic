@@ -347,6 +347,17 @@
               <!-- Thanh điều khiển gửi tin nhắn -->
               <div class="chat-controls">
                 
+                <!-- Gợi ý từ AI -->
+                <div class="suggested-reply-box" id="suggested-reply-box" style="display: none;">
+                  <div class="suggested-header">
+                    <span class="suggested-title"><i data-lucide="sparkles" class="tennis-icon"></i> AI đề xuất trả lời:</span>
+                    <button type="button" class="btn btn-tennis btn-xs" id="btn-use-suggestion">
+                      Dùng câu gợi ý
+                    </button>
+                  </div>
+                  <div class="suggested-content" id="suggested-reply-text">...</div>
+                </div>
+
                 <!-- Mô phỏng khách hàng (Test Mode) -->
                 <div class="simulation-input-bar">
                   <span class="sim-badge">Giả lập Khách nhắn</span>
@@ -554,6 +565,16 @@
                 <label for="set-discord-webhook">Discord Webhook URL</label>
                 <input type="text" id="set-discord-webhook" placeholder="Nhập Webhook URL từ Discord Channel của bạn">
                 <span class="input-hint">Nhắc lịch tập tự động qua kênh Discord 15 phút trước giờ học.</span>
+              </div>
+
+              <h4 class="section-title" style="margin-top: 20px;"><i data-lucide="database"></i> Cơ sở dữ liệu Supabase (PostgreSQL)</h4>
+              <div class="form-group">
+                <label for="set-supabase-url">Supabase URL</label>
+                <input type="text" id="set-supabase-url" placeholder="https://xxx.supabase.co">
+              </div>
+              <div class="form-group" style="margin-top: 10px;">
+                <label for="set-supabase-key">Supabase Public Anon Key</label>
+                <input type="password" id="set-supabase-key" placeholder="Nhập Anon/Public API Key của Supabase">
               </div>
 
               <div class="form-actions">
