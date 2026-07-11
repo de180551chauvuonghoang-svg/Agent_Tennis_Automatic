@@ -28,3 +28,7 @@ CREATE TABLE messages (
 
 -- 3. Chỉ mục (index) giúp tăng tốc độ truy vấn
 CREATE INDEX idx_messages_lead_id ON messages(lead_id);
+
+-- 4. Tắt Row-Level Security (RLS) để Anon Key có thể truy cập đọc/ghi trực tiếp
+ALTER TABLE leads DISABLE ROW LEVEL SECURITY;
+ALTER TABLE messages DISABLE ROW LEVEL SECURITY;
