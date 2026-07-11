@@ -89,6 +89,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSettingsHandlers();
   setupBookingHandlers();
 
+  // Thiết lập Real-time WebSockets với Socket.io
+  setupSocketConnection();
+
   // Định kỳ tải danh sách Leads mỗi 10 giây để giữ dữ liệu cập nhật
   setInterval(fetchLeads, 10000);
 });
@@ -1258,3 +1261,112 @@ window.deleteLeadPermanently = async function(leadId, event) {
     alert('Không thể xóa: ' + error.message);
   }
 };
+
+// ==================== REAL-TIME WEBSOCKETS (SOCKET.IO) ====================
+function setupSocketConnection() {
+  if (typeof io === 'undefined') {
+    console.warn('[Socket.io] Thư viện io chưa được tải.');
+    return;
+  }
+
+  const socket = io();
+
+  socket.on('connect', () => {
+    console.log('[Socket.io] Đã kết nối thành công với server thời gian thực.');
+  });
+
+  socket.on('lead_update', (updatedLead) => {
+    console.log('[Socket.io] Nhận tín hiệu cập nhật khách hàng:', updatedLead);
+    if (!updatedLead) return;
+
+    // Tìm xem lead có tồn tại trong danh sách hiện tại không
+    const idx = leadsList.findIndex(l => l.id === updatedLead.id);
+    
+    // Kiểm tra xem tin nhắn cuối cùng có phải là tin mới đến từ khách hàng không
+    let isNewIncomingMessage = false;
+    if (updatedLead.messages && updatedLead.messages.length > 0) {
+      const lastMsg = updatedLead.messages[updatedLead.messages.length - 1];
+      const oldLead = idx !== -1 ? leadsList[idx] : null;
+      const oldLastMsg = oldLead && oldLead.messages && oldLead.messages.length > 0
+        ? oldLead.messages[oldLead.messages.length - 1]
+        : null;
+
+      // Nếu tin nhắn mới nhất là từ 'user' và khác tin nhắn cũ của khách
+      if (lastMsg.sender === 'user' && (!oldLastMsg || oldLastMsg.id !== lastMsg.id)) {
+        isNewIncomingMessage = true;
+      }
+    }
+
+    if (idx !== -1) {
+      // Cập nhật thông tin khách hàng cũ
+      leadsList[idx] = updatedLead;
+    } else {
+      // Thêm mới nếu chưa có và không bị ẩn mềm
+      if (!hiddenLeads.includes(updatedLead.id)) {
+        leadsList.unshift(updatedLead);
+      }
+    }
+
+    // Tải lại các số liệu thống kê & Sidebar
+    renderLeadsProgress();
+    renderChatSidebar();
+    updateMetrics();
+
+    // Nếu đang mở chat đúng khách hàng này, re-render khung chat
+    if (activeChatLeadId === updatedLead.id) {
+      renderChatWindow(updatedLead);
+    }
+
+    // Nếu là tin nhắn mới từ khách, phát âm thanh thông báo và thay đổi title
+    if (isNewIncomingMessage) {
+      playNotificationSound();
+      flashTitleNotification(updatedLead.name || 'Khách hàng');
+    }
+  });
+
+  socket.on('lead_delete', (deletedLeadId) => {
+    console.log('[Socket.io] Nhận tín hiệu xóa khách hàng:', deletedLeadId);
+    leadsList = leadsList.filter(l => l.id !== deletedLeadId);
+
+    renderLeadsProgress();
+    renderChatSidebar();
+    updateMetrics();
+
+    if (activeChatLeadId === deletedLeadId) {
+      activeChatLeadId = null;
+      document.getElementById('chat-placeholder').style.display = 'flex';
+      document.getElementById('chat-content').style.display = 'none';
+    }
+  });
+}
+
+function playNotificationSound() {
+  const audio = document.getElementById('notification-sound');
+  if (audio) {
+    audio.currentTime = 0;
+    // Chạy play() trong một tương tác người dùng hoặc bắt lỗi autoplay policy của trình duyệt
+    audio.play().catch(e => console.warn('[Socket.io] Autoplay bị chặn bởi trình duyệt, cần click tương tác trước:', e));
+  }
+}
+
+let flashInterval = null;
+function flashTitleNotification(senderName) {
+  const originalTitle = document.title;
+  if (flashInterval) clearInterval(flashInterval);
+  
+  let showAlt = true;
+  flashInterval = setInterval(() => {
+    document.title = showAlt ? `💬 Tin nhắn từ ${senderName}` : originalTitle;
+    showAlt = !showAlt;
+  }, 1000);
+
+  // Dừng nhấp nháy khi người dùng click chuột vào cửa sổ trình duyệt
+  const stopFlash = () => {
+    clearInterval(flashInterval);
+    document.title = originalTitle;
+    window.removeEventListener('focus', stopFlash);
+    window.removeEventListener('click', stopFlash);
+  };
+  window.addEventListener('focus', stopFlash);
+  window.addEventListener('click', stopFlash);
+}

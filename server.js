@@ -13,6 +13,24 @@ const dbService = require('./services/db');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Cấu hình HTTP Server và Socket.io
+const http = require('http');
+const { Server } = require('socket.io');
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log(`[Socket.io] Client kết nối: ${socket.id}`);
+  socket.on('disconnect', () => {
+    console.log(`[Socket.io] Client ngắt kết nối: ${socket.id}`);
+  });
+});
+
 // Cấu hình Middleware
 app.use(cors());
 app.use(express.json());
@@ -191,6 +209,7 @@ app.post('/api/leads/upload', upload.single('screenshot'), async (req, res) => {
 
     // Lưu ngay lập tức vào database sau khi OCR xong
     const savedLead = await dbService.createLead(newLead);
+    io.emit('lead_update', savedLead);
     res.json({ success: true, lead: savedLead });
   } catch (error) {
     console.error('Lỗi khi chạy OCR:', error);
@@ -208,6 +227,7 @@ app.post('/api/leads', async (req, res) => {
 
   try {
     const newLead = await dbService.createLead(leadData);
+    io.emit('lead_update', newLead);
     res.json({ success: true, lead: newLead });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -218,6 +238,7 @@ app.post('/api/leads', async (req, res) => {
 app.delete('/api/leads/:id', async (req, res) => {
   try {
     await dbService.deleteLead(req.params.id);
+    io.emit('lead_delete', req.params.id);
     res.json({ success: true });
   } catch (error) {
     res.status(404).json({ error: error.message });
@@ -286,9 +307,11 @@ app.post('/api/leads/start-chat', async (req, res) => {
     }
 
     const updatedLeads = await dbService.getLeads();
+    const updatedLead = updatedLeads.find(l => l.id === id);
+    io.emit('lead_update', updatedLead);
     res.json({ 
       success: true, 
-      lead: updatedLeads.find(l => l.id === id), 
+      lead: updatedLead, 
       chatLink: link,
       apiSent: !sendResult.simulated,
       apiError: sendResult.error || null
@@ -328,7 +351,9 @@ app.post('/api/chat/send-manual', async (req, res) => {
     }
 
     const updatedLeads = await dbService.getLeads();
-    res.json({ success: true, messages: updatedLeads.find(l => l.id === leadId).messages });
+    const updatedLead = updatedLeads.find(l => l.id === leadId);
+    io.emit('lead_update', updatedLead);
+    res.json({ success: true, messages: updatedLead.messages });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -391,7 +416,9 @@ app.post('/api/chat/simulate-message', async (req, res) => {
       }
 
       const finalLeads = await dbService.getLeads();
-      return res.json({ success: true, lead: finalLeads.find(l => l.id === leadId), replySimulated: false });
+      const finalLead = finalLeads.find(l => l.id === leadId);
+      io.emit('lead_update', finalLead);
+      return res.json({ success: true, lead: finalLead, replySimulated: false });
     }
 
     // 2. Chạy Chatbot AI Gemini khi đang ở trạng thái Chatting tự động
@@ -452,9 +479,11 @@ app.post('/api/chat/simulate-message', async (req, res) => {
     }
 
     const finalLeads = await dbService.getLeads();
+    const finalLead = finalLeads.find(l => l.id === leadId);
+    io.emit('lead_update', finalLead);
     res.json({ 
       success: true, 
-      lead: finalLeads.find(l => l.id === leadId), 
+      lead: finalLead, 
       replySimulated: true, 
       aiResponse,
       bannerSent
@@ -528,9 +557,11 @@ app.post('/api/leads/confirm-booking', async (req, res) => {
     await dbService.addMessage(leadId, systemMsg);
 
     const finalLeads = await dbService.getLeads();
+    const finalLead = finalLeads.find(l => l.id === leadId);
+    io.emit('lead_update', finalLead);
     res.json({ 
       success: true, 
-      lead: finalLeads.find(l => l.id === leadId),
+      lead: finalLead,
       calendarSynced: !calendarResult.simulated,
       crmSynced: !crmResult.simulated
     });
@@ -673,6 +704,17 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
     }
   } catch (error) {
     console.error('Lỗi khi xử lý webhook tin nhắn WhatsApp:', error);
+  }
+
+  // Phát tín hiệu cập nhật thời gian thực qua socket
+  try {
+    const finalLeads = await dbService.getLeads();
+    const finalLead = finalLeads.find(l => l.id === lead.id);
+    if (finalLead) {
+      io.emit('lead_update', finalLead);
+    }
+  } catch (emitError) {
+    console.error('Lỗi phát socket lead_update:', emitError);
   }
 
   res.type('text/xml').send('<Response></Response>');
@@ -837,7 +879,7 @@ function startDiscordNotificationScheduler() {
 // Kích hoạt scheduler
 startDiscordNotificationScheduler();
 
-// Khởi chạy server
-app.listen(PORT, () => {
+// Khởi chạy server bằng http server để hỗ trợ WebSockets
+server.listen(PORT, () => {
   console.log(`Tennis AI Sales Assistant Server đang chạy tại: http://localhost:${PORT}`);
 });
