@@ -665,6 +665,45 @@
     </div>
   </div>
 
+  <!-- Custom Confirm Modal -->
+  <div class="modal-overlay" id="custom-confirm-modal">
+    <div class="modal-card glass" style="max-width: 420px; width: 90%;">
+      <div class="modal-header">
+        <h3 id="confirm-title" style="display: flex; align-items: center; gap: 8px; font-size: 1.1rem;">
+          <i data-lucide="help-circle" class="tennis-icon" style="color: var(--color-tennis); width: 20px; height: 20px;"></i> 
+          <span>Xác nhận</span>
+        </h3>
+        <button class="modal-close" id="btn-close-confirm-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" style="padding-top: 15px;">
+        <p id="confirm-message" style="margin-bottom: 20px; line-height: 1.6; color: var(--color-text-secondary); font-size: 0.92rem; white-space: pre-line;"></p>
+        <div class="modal-actions" style="margin-top: 0; display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-confirm" style="padding: 8px 16px; font-size: 0.85rem;">Hủy bỏ</button>
+          <button type="button" class="btn btn-tennis" id="btn-agree-confirm" style="padding: 8px 20px; font-size: 0.85rem; font-weight: 600;">Đồng ý</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Alert Modal -->
+  <div class="modal-overlay" id="custom-alert-modal">
+    <div class="modal-card glass" style="max-width: 420px; width: 90%;">
+      <div class="modal-header">
+        <h3 id="alert-title" style="display: flex; align-items: center; gap: 8px; font-size: 1.1rem;">
+          <i data-lucide="info" class="tennis-icon" style="color: var(--color-tennis); width: 20px; height: 20px;"></i> 
+          <span>Thông báo</span>
+        </h3>
+        <button class="modal-close" id="btn-close-alert-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" style="padding-top: 15px;">
+        <p id="alert-message" style="margin-bottom: 20px; line-height: 1.6; color: var(--color-text-secondary); font-size: 0.92rem; white-space: pre-line;"></p>
+        <div class="modal-actions" style="margin-top: 0; display: flex; justify-content: flex-end;">
+          <button type="button" class="btn btn-tennis" id="btn-ok-alert" style="padding: 8px 24px; font-size: 0.85rem; font-weight: 600;">Đồng ý</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Audio thông báo khi có yêu cầu chốt lịch -->
   <audio id="notification-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav" preload="auto"></audio>
 

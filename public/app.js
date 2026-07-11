@@ -1218,13 +1218,14 @@ function setupSettingsHandlers() {
 
 // ==================== QUẢN LÝ ẨN/HIỆN LEADS (SOFT-DELETE) ====================
 
-window.hideLead = function(leadId, event) {
+window.hideLead = async function(leadId, event) {
   if (event) {
     event.stopPropagation();
     event.preventDefault();
   }
   
-  if (confirm('Bạn có chắc chắn muốn ẩn khách hàng này khỏi giao diện không? (Dữ liệu vẫn được lưu trữ ở database)')) {
+  const confirmed = await showCustomConfirm('Bạn có chắc chắn muốn ẩn khách hàng này khỏi giao diện không?\n(Dữ liệu vẫn được lưu trữ ở database của Supabase)', 'Xác nhận ẩn khách hàng');
+  if (confirmed) {
     if (!hiddenLeads.includes(leadId)) {
       hiddenLeads.push(leadId);
       localStorage.setItem('hiddenLeads', JSON.stringify(hiddenLeads));
@@ -1233,17 +1234,18 @@ window.hideLead = function(leadId, event) {
   }
 };
 
-window.restoreHiddenLeads = function() {
+window.restoreHiddenLeads = async function() {
   if (hiddenLeads.length === 0) {
-    alert('Không có khách hàng nào đang bị ẩn.');
+    await showCustomAlert('Không có khách hàng nào đang bị ẩn.', 'Thông báo');
     return;
   }
   
-  if (confirm('Bạn có chắc chắn muốn khôi phục hiển thị cho tất cả khách hàng đã ẩn không?')) {
+  const confirmed = await showCustomConfirm('Bạn có chắc chắn muốn khôi phục hiển thị cho tất cả khách hàng đã ẩn không?', 'Xác nhận khôi phục');
+  if (confirmed) {
     hiddenLeads = [];
     localStorage.removeItem('hiddenLeads');
     fetchLeads();
-    alert('Đã khôi phục tất cả khách hàng thành công!');
+    await showCustomAlert('Đã khôi phục tất cả khách hàng thành công!', 'Thành công');
   }
 };
 
@@ -1253,7 +1255,8 @@ window.deleteLeadPermanently = async function(leadId, event) {
     event.preventDefault();
   }
 
-  if (!confirm('Bạn có chắc chắc muốn XÓA VĨNH VIỄN khách hàng này khỏi database không?\n\n⚠️ Hành động này KHÔNG THỂ hoàn tác! Toàn bộ lịch sử nhắn tin sẽ bị xóa.')) return;
+  const confirmed = await showCustomConfirm('Bạn có chắc chắc muốn XÓA VĨNH VIỄN khách hàng này khỏi database không?\n\n⚠️ Hành động này KHÔNG THỂ hoàn tác! Toàn bộ lịch sử nhắn tin sẽ bị xóa sạch.', '⚠️ CẢNH BÁO XÓA VĨNH VIỄN');
+  if (!confirmed) return;
 
   try {
     const response = await fetch(`/api/leads/${leadId}`, {
@@ -1278,8 +1281,9 @@ window.deleteLeadPermanently = async function(leadId, event) {
     localStorage.setItem('hiddenLeads', JSON.stringify(hiddenLeads));
 
     fetchLeads();
+    await showCustomAlert('Đã xóa vĩnh viễn khách hàng thành công!', 'Thành công');
   } catch (error) {
-    alert('Không thể xóa: ' + error.message);
+    await showCustomAlert('Không thể xóa: ' + error.message, 'Lỗi');
   }
 };
 
@@ -1391,3 +1395,71 @@ function flashTitleNotification(senderName) {
   window.addEventListener('focus', stopFlash);
   window.addEventListener('click', stopFlash);
 }
+
+// ==================== HỆ THỐNG POPUP MODAL TỰ THIẾT KẾ (CUSTOM ALERTS/CONFIRMS) ====================
+
+window.showCustomAlert = function(message, title = 'Thông báo') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('custom-alert-modal');
+    document.getElementById('alert-title').innerHTML = `
+      <i data-lucide="info" class="tennis-icon" style="color: var(--color-tennis); width: 20px; height: 20px;"></i> 
+      <span>${title}</span>
+    `;
+    document.getElementById('alert-message').textContent = message;
+    
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+
+    const btnOk = document.getElementById('btn-ok-alert');
+    const btnClose = document.getElementById('btn-close-alert-modal');
+
+    const closeHandler = () => {
+      modal.classList.remove('active');
+      btnOk.removeEventListener('click', closeHandler);
+      btnClose.removeEventListener('click', closeHandler);
+      resolve();
+    };
+
+    btnOk.addEventListener('click', closeHandler);
+    btnClose.addEventListener('click', closeHandler);
+  });
+};
+
+window.showCustomConfirm = function(message, title = 'Xác nhận') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('custom-confirm-modal');
+    document.getElementById('confirm-title').innerHTML = `
+      <i data-lucide="help-circle" class="tennis-icon" style="color: var(--color-tennis); width: 20px; height: 20px;"></i> 
+      <span>${title}</span>
+    `;
+    document.getElementById('confirm-message').textContent = message;
+
+    modal.classList.add('active');
+    if (window.lucide) lucide.createIcons();
+
+    const btnAgree = document.getElementById('btn-agree-confirm');
+    const btnCancel = document.getElementById('btn-cancel-confirm');
+    const btnClose = document.getElementById('btn-close-confirm-modal');
+
+    const cleanUp = () => {
+      modal.classList.remove('active');
+      btnAgree.removeEventListener('click', agreeHandler);
+      btnCancel.removeEventListener('click', cancelHandler);
+      btnClose.removeEventListener('click', cancelHandler);
+    };
+
+    const agreeHandler = () => {
+      cleanUp();
+      resolve(true);
+    };
+
+    const cancelHandler = () => {
+      cleanUp();
+      resolve(false);
+    };
+
+    btnAgree.addEventListener('click', agreeHandler);
+    btnCancel.addEventListener('click', cancelHandler);
+    btnClose.addEventListener('click', cancelHandler);
+  });
+};

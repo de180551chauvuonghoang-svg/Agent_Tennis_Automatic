@@ -1687,3 +1687,13 @@ input:checked + .slider:before {
   }
 }
 
+/* Styling for Select Option dropdowns for readability */
+select option {
+  background-color: #1a1f26 !important;
+  color: #ffffff !important;
+}
+
+select option:disabled {
+  color: rgba(255, 255, 255, 0.3) !important;
+}
+
