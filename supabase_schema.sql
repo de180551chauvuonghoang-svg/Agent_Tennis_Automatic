@@ -11,6 +11,7 @@ CREATE TABLE leads (
     status TEXT NOT NULL DEFAULT 'New',
     language TEXT DEFAULT 'vi',
     booking_details JSONB,
+    suggested_reply JSONB,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 

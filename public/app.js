@@ -123,8 +123,6 @@ async function fetchConfig() {
     document.getElementById('set-google-email').value = systemConfig.google_credentials?.client_email || '';
     document.getElementById('set-google-key').value = systemConfig.google_credentials?.private_key || '';
     document.getElementById('set-discord-webhook').value = systemConfig.discord_webhook_url || '';
-    document.getElementById('set-supabase-url').value = systemConfig.supabase_url || '';
-    document.getElementById('set-supabase-key').value = systemConfig.supabase_key || '';
 
     // Cập nhật preview banner tiếng Anh
     const bannerImg = document.getElementById('banner-preview-img');
@@ -1138,8 +1136,6 @@ function setupSettingsHandlers() {
       google_sheets_id: document.getElementById('set-google-sheets-id').value.trim(),
       google_calendar_id: document.getElementById('set-google-calendar-id').value.trim(),
       discord_webhook_url: document.getElementById('set-discord-webhook').value.trim(),
-      supabase_url: document.getElementById('set-supabase-url').value.trim(),
-      supabase_key: document.getElementById('set-supabase-key').value.trim(),
       google_credentials: {
         client_email: document.getElementById('set-google-email').value.trim(),
         private_key: document.getElementById('set-google-key').value.trim()

@@ -189,7 +189,9 @@ app.post('/api/leads/upload', upload.single('screenshot'), async (req, res) => {
       });
     }
 
-    res.json({ success: true, lead: newLead });
+    // Lưu ngay lập tức vào database sau khi OCR xong
+    const savedLead = await dbService.createLead(newLead);
+    res.json({ success: true, lead: savedLead });
   } catch (error) {
     console.error('Lỗi khi chạy OCR:', error);
     res.status(500).json({ error: 'Không thể xử lý ảnh bằng OCR. Hãy thử điền tay thông tin.' });
