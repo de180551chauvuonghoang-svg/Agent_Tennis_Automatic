@@ -893,7 +893,6 @@ startDiscordNotificationScheduler();
 
 // ==================== TỰ ĐỘNG KHỞI ĐỘNG NGROK ====================
 const { spawn } = require('child_process');
-const http = require('http');
 
 function startNgrok() {
   console.log('[Ngrok] Đang khởi động đường hầm ngrok...');
