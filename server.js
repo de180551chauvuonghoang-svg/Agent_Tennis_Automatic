@@ -71,24 +71,39 @@ function writeConfig(data) {
 }
 
 // Chuẩn hóa số điện thoại và phát hiện quốc gia
+// So sánh 2 số điện thoại bằng cách làm sạch và so sánh phần số nghĩa
+function isSamePhone(phoneA, phoneB) {
+  if (!phoneA || !phoneB) return false;
+  
+  const cleanA = phoneA.replace(/\D/g, ''); // chỉ giữ chữ số
+  const cleanB = phoneB.replace(/\D/g, '');
+  
+  const normA = cleanA.startsWith('84') && cleanA.length === 11 ? '0' + cleanA.substring(2) : cleanA;
+  const normB = cleanB.startsWith('84') && cleanB.length === 11 ? '0' + cleanB.substring(2) : cleanB;
+  
+  const finalA = normA.startsWith('0') ? normA.substring(1) : normA;
+  const finalB = normB.startsWith('0') ? normB.substring(1) : normB;
+  
+  return finalA === finalB;
+}
+
+// Chuẩn hóa số điện thoại và phát hiện quốc gia (luôn quy về định dạng E.164 chuẩn quốc tế +84...)
 function normalizePhoneNumber(phoneStr) {
   if (!phoneStr) return { phone: '', platform: 'Zalo' };
 
-  // Giữ dấu + nếu có, sau đó chỉ loại ký tự phi số trong phần còn lại
-  const hasPlus = phoneStr.trim().startsWith('+');
   let clean = phoneStr.replace(/\D/g, ''); // chỉ giữ chữ số
 
-  // Việt Nam: bắt đầu bằng 84 (11 số) hoặc 0 (10 số)
-  const isVietnam =
-    (!hasPlus && clean.startsWith('0') && clean.length === 10) ||
-    (clean.startsWith('84') && clean.length === 11);
-
-  if (isVietnam) {
-    if (clean.startsWith('84')) clean = '0' + clean.substring(2);
-    return { phone: clean, platform: 'Zalo' };
+  // Nếu bắt đầu bằng số 0 (ví dụ số Việt Nam: 0888665161)
+  if (phoneStr.trim().startsWith('0') && clean.length === 10) {
+    return { phone: '+84' + clean.substring(1), platform: 'Zalo' };
   }
 
-  // Số quốc tế: giữ dấu +
+  // Nếu bắt đầu bằng 84 và có 11 chữ số (ví dụ: 84888665161)
+  if (clean.startsWith('84') && clean.length === 11) {
+    return { phone: '+' + clean, platform: 'Zalo' };
+  }
+
+  // Số quốc tế hoặc đã ở dạng chuẩn +84...
   return { phone: '+' + clean, platform: 'WhatsApp' };
 }
 
@@ -197,7 +212,7 @@ app.post('/api/leads/upload', upload.single('screenshot'), async (req, res) => {
 
     // Kiểm tra xem số điện thoại đã tồn tại chưa
     const leads = await dbService.getLeads();
-    const existing = leads.find(l => l.phone === newLead.phone && newLead.phone !== '');
+    const existing = leads.find(l => isSamePhone(l.phone, newLead.phone) && newLead.phone !== '');
     if (existing) {
       return res.json({
         success: true,
@@ -581,7 +596,7 @@ app.post('/api/webhooks/whatsapp', async (req, res) => {
   const { phone } = normalizePhoneNumber(rawPhone);
 
   const leads = await dbService.getLeads();
-  let lead = leads.find(l => l.phone === phone);
+  let lead = leads.find(l => isSamePhone(l.phone, phone));
 
   if (!lead) {
     // Tạo lead mới tự động nếu chưa có
