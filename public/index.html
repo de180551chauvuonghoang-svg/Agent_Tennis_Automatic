@@ -568,6 +568,26 @@
                 <span class="input-hint">Nhắc lịch tập tự động qua kênh Discord 15 phút trước giờ học.</span>
               </div>
 
+              <h4 class="section-title" style="margin-top: 20px;"><i data-lucide="message-square"></i> Cấu hình Twilio WhatsApp (Gửi tin thật)</h4>
+              <div class="form-group">
+                <label for="set-twilio-sid">Twilio Account SID</label>
+                <input type="text" id="set-twilio-sid" placeholder="Nhập Twilio Account SID (ví dụ: AC...)">
+              </div>
+              <div class="form-group">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <label for="set-twilio-token">Twilio Auth Token</label>
+                  <button type="button" class="btn btn-link btn-xs" id="btn-toggle-twilio-token" style="padding:0; margin-bottom:4px; font-size:0.75rem; text-decoration:none; color:var(--color-tennis); display:flex; align-items:center; gap:4px;">
+                    <i data-lucide="eye" style="width:14px; height:14px;"></i> Hiện token
+                  </button>
+                </div>
+                <input type="password" id="set-twilio-token" placeholder="Nhập Twilio Auth Token">
+              </div>
+              <div class="form-group">
+                <label for="set-twilio-from">Số điện thoại gửi Twilio WhatsApp</label>
+                <input type="text" id="set-twilio-from" placeholder="whatsapp:+14155238886">
+                <span class="input-hint">Nhập số gửi tin nhắn từ Twilio Console. Đối với tài khoản thử nghiệm, điền: whatsapp:+14155238886</span>
+              </div>
+
               <div class="form-actions">
                 <button type="submit" class="btn btn-tennis" id="btn-save-api">Lưu kết nối API</button>
               </div>

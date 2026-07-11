@@ -126,6 +126,9 @@ async function fetchConfig() {
     document.getElementById('set-google-email').value = systemConfig.google_credentials?.client_email || '';
     document.getElementById('set-google-key').value = systemConfig.google_credentials?.private_key || '';
     document.getElementById('set-discord-webhook').value = systemConfig.discord_webhook_url || '';
+    document.getElementById('set-twilio-sid').value = systemConfig.whatsapp_credentials?.account_sid || '';
+    document.getElementById('set-twilio-token').value = systemConfig.whatsapp_credentials?.auth_token || '';
+    document.getElementById('set-twilio-from').value = systemConfig.whatsapp_credentials?.from_number || 'whatsapp:+14155238886';
 
     // Cập nhật preview banner tiếng Anh
     const bannerImg = document.getElementById('banner-preview-img');
@@ -1097,6 +1100,25 @@ function setupSettingsHandlers() {
     lucide.createIcons();
   });
 
+  // Toggle ẩn hiện Twilio Auth Token
+  const btnToggleTwilioToken = document.getElementById('btn-toggle-twilio-token');
+  if (btnToggleTwilioToken) {
+    btnToggleTwilioToken.addEventListener('click', () => {
+      const keyInput = document.getElementById('set-twilio-token');
+      const eyeIcon = btnToggleTwilioToken.querySelector('i');
+      if (keyInput.type === 'password') {
+        keyInput.type = 'text';
+        eyeIcon.setAttribute('data-lucide', 'eye-off');
+        btnToggleTwilioToken.innerHTML = '<i data-lucide="eye-off" style="width:14px; height:14px;"></i> Ẩn token';
+      } else {
+        keyInput.type = 'password';
+        eyeIcon.setAttribute('data-lucide', 'eye');
+        btnToggleTwilioToken.innerHTML = '<i data-lucide="eye" style="width:14px; height:14px;"></i> Hiện token';
+      }
+      lucide.createIcons();
+    });
+  }
+
   // Lưu thiết lập FAQ
   formFaq.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1144,6 +1166,11 @@ function setupSettingsHandlers() {
       google_sheets_id: document.getElementById('set-google-sheets-id').value.trim(),
       google_calendar_id: document.getElementById('set-google-calendar-id').value.trim(),
       discord_webhook_url: document.getElementById('set-discord-webhook').value.trim(),
+      whatsapp_credentials: {
+        account_sid: document.getElementById('set-twilio-sid').value.trim(),
+        auth_token: document.getElementById('set-twilio-token').value.trim(),
+        from_number: document.getElementById('set-twilio-from').value.trim() || 'whatsapp:+14155238886'
+      },
       google_credentials: {
         client_email: document.getElementById('set-google-email').value.trim(),
         private_key: document.getElementById('set-google-key').value.trim()
@@ -1158,13 +1185,13 @@ function setupSettingsHandlers() {
       });
 
       if (response.ok) {
-        alert('Đã cập nhật cấu hình API & kết nối Google thành công!');
+        await showCustomAlert('Đã cập nhật cấu hình API, Twilio & kết nối Google thành công!', 'Thành công');
         fetchConfig();
       } else {
         throw new Error('Lỗi từ server');
       }
     } catch (error) {
-      alert('Không thể lưu cài đặt API: ' + error.message);
+      await showCustomAlert('Không thể lưu cài đặt API: ' + error.message, 'Lỗi');
     }
   });
 
