@@ -891,7 +891,63 @@ function startDiscordNotificationScheduler() {
 // Kích hoạt scheduler
 startDiscordNotificationScheduler();
 
+// ==================== TỰ ĐỘNG KHỞI ĐỘNG NGROK ====================
+const { spawn } = require('child_process');
+const http = require('http');
+
+function startNgrok() {
+  console.log('[Ngrok] Đang khởi động đường hầm ngrok...');
+  
+  // Khởi chạy ngrok http 3000
+  const ngrok = spawn('ngrok', ['http', '3000'], { shell: true });
+
+  ngrok.on('error', (err) => {
+    console.error('[Ngrok] Không thể chạy lệnh ngrok. Hãy chắc chắn rằng ngrok đã được cài đặt và thêm vào biến môi trường PATH.', err.message);
+  });
+
+  // Truy vấn API local của ngrok để lấy public URL sau mỗi 1 giây cho đến khi lấy được (tối đa 10 lần)
+  let attempts = 0;
+  const intervalId = setInterval(() => {
+    attempts++;
+    http.get('http://127.0.0.1:4040/api/tunnels', (res) => {
+      let rawData = '';
+      res.on('data', (chunk) => { rawData += chunk; });
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(rawData);
+          if (data && data.tunnels && data.tunnels.length > 0) {
+            const publicUrl = data.tunnels[0].public_url;
+            console.log('\n=============================================================');
+            console.log(`🎾 NGROK ĐÃ KHỞI ĐỘNG THÀNH CÔNG!`);
+            console.log(`🔗 Link truy cập công khai (Web deployed on Internet):`);
+            console.log(`   --> ${publicUrl} <--`);
+            console.log(`\n👉 Webhook WhatsApp Twilio cần dán:`);
+            console.log(`   --> ${publicUrl}/api/webhooks/whatsapp <--`);
+            console.log('=============================================================\n');
+            clearInterval(intervalId);
+          }
+        } catch (e) {
+          // Lỗi parse hoặc chưa có tunnel
+        }
+      });
+    }).on('error', (err) => {
+      // Đợi lần thử tiếp theo
+    });
+
+    if (attempts >= 10) {
+      clearInterval(intervalId);
+      console.log('[Ngrok] Không tìm thấy API local của ngrok sau 10 giây. Hãy chạy tay ngrok nếu cần.');
+    }
+  }, 1000);
+
+  // Đảm bảo tắt ngrok khi tắt server Node
+  process.on('SIGTERM', () => ngrok.kill());
+  process.on('SIGINT', () => ngrok.kill());
+  process.on('exit', () => ngrok.kill());
+}
+
 // Khởi chạy server bằng http server để hỗ trợ WebSockets
 server.listen(PORT, () => {
   console.log(`Tennis AI Sales Assistant Server đang chạy tại: http://localhost:${PORT}`);
+  startNgrok();
 });
