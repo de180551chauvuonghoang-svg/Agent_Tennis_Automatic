@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tennis AI Sales Assistant - Dashboard điều khiển</title>
+  <meta name="description" content="Hệ thống tự động hóa chăm sóc và tiếp nhận học viên Tennis thông minh sử dụng OCR và Gemini AI.">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div style="display: flex; align-items: center; gap: 12px; flex-grow: 1;">
+          <div class="brand-logo">
+            <i data-lucide="activity" class="tennis-icon"></i>
+          </div>
+          <div class="brand-text">
+            <h2>TENNIS AI</h2>
+            <span>Sales Assistant</span>
+          </div>
+        </div>
+        <button id="btn-close-sidebar" class="btn-close-sidebar mobile-only-btn" style="display: none; background: transparent; border: none; color: var(--color-text-secondary); cursor: pointer; padding: 4px;" onclick="toggleSidebar()">
+          <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+        </button>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-tab="dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Tổng quan</span>
+        </button>
+        <button class="nav-btn" data-tab="chathub">
+          <i data-lucide="message-square"></i>
+          <span>Hộp thư chat</span>
+          <span class="badge badge-pulse" id="chat-notification-badge" style="display: none;">0</span>
+        </button>
+        <button class="nav-btn" data-tab="settings">
+          <i data-lucide="settings"></i>
+          <span>Cấu hình</span>
+        </button>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <div class="coach-profile-summary">
+          <div class="coach-avatar">
+            <i data-lucide="user"></i>
+          </div>
+          <div class="coach-info-summary">
+            <h4 id="summary-coach-name">HLV Nguyễn Văn A</h4>
+            <p>Huấn luyện viên</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content">
+      
+      <!-- HEADER -->
+      <header class="main-header">
+        <div class="header-title" style="display: flex; align-items: center;">
+          <button id="btn-toggle-sidebar" class="btn btn-secondary btn-sm mobile-only-btn" style="display: none; padding: 8px; margin-right: 12px;" onclick="toggleSidebar()">
+            <i data-lucide="menu" style="width: 20px; height: 20px;"></i>
+          </button>
+          <div>
+            <h1 id="page-title">Tổng quan hệ thống</h1>
+            <p id="page-subtitle">Quản lý và tiếp nhận học viên tiềm năng</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <div class="status-indicator">
+            <span class="indicator-dot online"></span>
+            <span class="indicator-text">AI Agent đang chạy</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- TAB: DASHBOARD -->
+      <section class="tab-panel active" id="tab-dashboard">
+        
+        <!-- THỐNG KÊ (METRICS) -->
+        <div class="metrics-grid">
+          <div class="metric-card glass">
+            <div class="metric-icon blue">
+              <i data-lucide="users"></i>
+            </div>
+            <div class="metric-data">
+              <h3 id="metric-total-leads">0</h3>
+              <p>Tổng số Lead</p>
+            </div>
+          </div>
+          <div class="metric-card glass">
+            <div class="metric-icon yellow">
+              <i data-lucide="message-circle"></i>
+            </div>
+            <div class="metric-data">
+              <h3 id="metric-chatting-leads">0</h3>
+              <p>Đang nhắn tin AI</p>
+            </div>
+          </div>
+          <div class="metric-card glass pulse-border">
+            <div class="metric-icon orange">
+              <i data-lucide="alert-circle"></i>
+            </div>
+            <div class="metric-data">
+              <h3 id="metric-awaiting-leads">0</h3>
+              <p>Chờ HLV chốt lịch</p>
+            </div>
+          </div>
+          <div class="metric-card glass">
+            <div class="metric-icon green">
+              <i data-lucide="calendar-check"></i>
+            </div>
+            <div class="metric-data">
+              <h3 id="metric-booked-leads">0</h3>
+              <p>Đã chốt lịch</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <!-- BÊN TRÁI: TIẾP NHẬN ẢNH CHỤP MÀN HÌNH -->
+          <div class="dashboard-col glass panel-ocr">
+            <div class="panel-header">
+              <h3><i data-lucide="scan-line" class="panel-icon"></i> Tiếp nhận khách hàng (OCR)</h3>
+              <p>Kéo thả hoặc tải lên ảnh chụp màn hình chứa thông tin khách hàng từ đối tác.</p>
+            </div>
+            
+            <div class="ocr-upload-zone" id="ocr-drop-zone">
+              <input type="file" id="ocr-file-input" accept="image/*" style="display: none;">
+              <i data-lucide="image-plus" class="upload-icon"></i>
+              <p class="upload-text">Kéo thả ảnh vào đây hoặc <span>chọn từ máy tính</span></p>
+              <p class="upload-hint">Hỗ trợ định dạng PNG, JPG, JPEG</p>
+            </div>
+
+            <!-- Preview ảnh tải lên -->
+            <div class="ocr-preview-container" id="ocr-preview-container" style="display: none;">
+              <div class="ocr-image-wrapper">
+                <img id="ocr-image-preview" src="" alt="Screenshot preview">
+              </div>
+              <div class="ocr-image-actions">
+                <button class="btn btn-secondary btn-sm" id="btn-ocr-cancel">Chọn ảnh khác</button>
+                <button class="btn btn-primary btn-sm" id="btn-ocr-process">
+                  <i data-lucide="cpu"></i> Chạy phân tích AI OCR
+                </button>
+              </div>
+            </div>
+
+            <!-- Kết quả OCR phân tích -->
+            <div class="ocr-result-form" id="ocr-result-form" style="display: none;">
+              <h4 class="form-title"><i data-lucide="check-check"></i> Kết quả phân tích AI:</h4>
+              
+              <!-- Cảnh báo trùng SĐT -->
+              <div class="alert alert-warning" id="duplicate-warning" style="display: none;">
+                <i data-lucide="alert-triangle"></i>
+                <div>
+                  <strong>Số điện thoại đã tồn tại!</strong>
+                  <p>Hệ thống phát hiện khách hàng này đã có trong dữ liệu.</p>
+                  <button class="btn btn-secondary btn-xs" id="btn-view-duplicate">Mở chat khách hàng này</button>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Số điện thoại khách hàng</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="text" id="ocr-country-code" placeholder="+86" style="width: 80px; flex-shrink: 0; text-align: center; font-weight: 600; font-family: var(--font-mono, monospace);" maxlength="6">
+                  <span style="color: var(--color-text-muted); font-size: 1.2rem; line-height: 1;">–</span>
+                  <input type="text" id="ocr-phone-body" placeholder="138 2430 1352" style="flex: 1;">
+                </div>
+                <p style="font-size: 0.72rem; color: var(--color-text-muted); margin-top: 6px;">
+                  <i data-lucide="info" style="width:12px;height:12px;vertical-align:middle;margin-right:3px;"></i>
+                  Ô trái: Mã quốc gia (vd: +84, +86). &nbsp; Ô phải: Số thuê bao (không gồm mã quốc gia).
+                </p>
+              </div>
+              
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="ocr-name">Họ tên (nếu có)</label>
+                  <input type="text" id="ocr-name" placeholder="Ví dụ: Anh Hùng, Chị Lan...">
+                </div>
+              <div class="form-group">
+                <label for="ocr-platform">Nền tảng kết nối</label>
+                <select id="ocr-platform">
+                  <option value="Zalo">Zalo (Việt Nam)</option>
+                  <option value="WhatsApp">WhatsApp (Quốc tế)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Chọn ngôn ngữ - chỉ hiển thị khi chọn WhatsApp -->
+            <div class="form-group" id="language-selector-group" style="display: none;">
+              <label for="ocr-language">
+                <i data-lucide="languages" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"></i>
+                Ngôn ngữ tin nhắn AI
+              </label>
+              <select id="ocr-language">
+                <option value="en">🇬🇧 English (Tiếng Anh)</option>
+                <option value="ar">🇦🇪 Arabic (Tiếng Ả Rập)</option>
+                <option value="fr">🇫🇷 French (Tiếng Pháp)</option>
+                <option value="zh">🇨🇳 Chinese (Tiếng Trung)</option>
+                <option value="ru">🇷🇺 Russian (Tiếng Nga)</option>
+                <option value="vi">🇻🇳 Vietnamese (Tiếng Việt)</option>
+              </select>
+            </div>
+
+              <div class="form-group">
+                <label for="ocr-notes">Ghi chú trích xuất từ ảnh</label>
+                <textarea id="ocr-notes" rows="3" placeholder="Thông tin giới thiệu, nhu cầu khách..."></textarea>
+              </div>
+
+              <div class="ocr-form-actions">
+                <button class="btn btn-secondary" id="btn-ocr-reset">Nhập lại</button>
+                <button class="btn btn-tennis" id="btn-ocr-save-start">
+                  <i data-lucide="message-square-plus"></i> Lưu & Gửi tin nhắn chào
+                </button>
+              </div>
+            </div>
+
+            <!-- Trạng thái loading -->
+            <div class="loading-overlay" id="ocr-loading" style="display: none;">
+              <div class="spinner"></div>
+              <p>AI đang quét ảnh chụp màn hình và trích xuất dữ liệu...</p>
+            </div>
+
+          </div>
+
+          <!-- BÊN PHẢI: DANH SÁCH LEADS MỚI & TIẾN TRÌNH -->
+          <div class="dashboard-col glass panel-leads">
+            <div class="panel-header">
+              <h3><i data-lucide="list-filter" class="panel-icon"></i> Tiến trình khách hàng</h3>
+              <p>Danh sách các liên hệ mới nhận và trạng thái tương ứng.</p>
+            </div>
+            
+            <div class="leads-filter">
+              <button class="filter-btn active" data-filter="all">Tất cả</button>
+              <button class="filter-btn" data-filter="New">Mới</button>
+              <button class="filter-btn" data-filter="Chatting">Đang nhắn AI</button>
+              <button class="filter-btn" data-filter="Awaiting Booking">Chờ chốt lịch</button>
+              <button class="filter-btn" data-filter="Booked">Đã chốt</button>
+            </div>
+
+            <div class="leads-list-container">
+              <div class="leads-list" id="leads-list">
+                <!-- Data leads load từ API -->
+                <div class="empty-state">
+                  <i data-lucide="users-round"></i>
+                  <p>Chưa có dữ liệu khách hàng. Hãy tải ảnh screenshot ở cột bên trái.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- TAB: CHATHUB -->
+      <section class="tab-panel" id="tab-chathub">
+        <div class="chathub-container glass">
+          
+          <!-- Hộp chat bên trái: Danh sách hội thoại -->
+          <div class="chat-sidebar">
+            <div class="chat-sidebar-header">
+              <h3>Hội thoại gần đây</h3>
+            </div>
+            <div class="chat-list" id="chat-list">
+              <!-- Load danh sách chat từ DB -->
+              <div class="empty-state">
+                <p>Không có hội thoại nào.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hộp chat bên phải: Cửa sổ nhắn tin -->
+          <div class="chat-window" id="chat-window">
+            
+            <!-- Trạng thái chưa chọn chat -->
+            <div class="chat-window-placeholder" id="chat-placeholder">
+              <i data-lucide="message-square-dashed"></i>
+              <h3>Chọn một khách hàng để xem hội thoại</h3>
+              <p>Hệ thống tự động đồng bộ tin nhắn và cho phép bạn can thiệp bất kỳ lúc nào.</p>
+            </div>
+
+            <!-- Nội dung chat chính -->
+            <div class="chat-window-content" id="chat-content" style="display: none;">
+              <!-- Header chat -->
+              <div class="chat-header">
+                <button id="btn-back-to-list" class="btn btn-secondary btn-sm mobile-only-btn" style="display: none; padding: 6px 10px; margin-right: 12px;" onclick="backToChatList()">
+                  <i data-lucide="arrow-left" style="width: 16px; height: 16px;"></i>
+                </button>
+                <div class="client-chat-profile">
+                  <div class="client-avatar" id="chat-avatar">U</div>
+                  <div class="client-meta">
+                    <h3 id="chat-client-name">Anh Hùng</h3>
+                    <p>
+                      <span id="chat-client-phone">0912345678</span> • 
+                      <span class="platform-tag" id="chat-client-platform">Zalo</span>
+                    </p>
+                  </div>
+                </div>
+                <div class="chat-header-actions">
+                  <!-- Trạng thái AI/HLV -->
+                  <div class="ai-status-toggle">
+                    <span id="ai-toggle-label">AI Tự động trả lời:</span>
+                    <label class="switch">
+                      <input type="checkbox" id="toggle-ai-active" checked>
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
+                  
+                  <!-- Nút mở chat app -->
+                  <a href="#" target="_blank" class="btn btn-secondary btn-sm" id="btn-open-deep-link">
+                    <i data-lucide="external-link"></i> Mở App nhắn
+                  </a>
+                </div>
+              </div>
+
+              <!-- Lịch sử tin nhắn -->
+              <div class="chat-messages" id="chat-messages-container">
+                <!-- Nội dung tin nhắn load động -->
+              </div>
+
+              <!-- Thanh thông báo trạng thái đặt lịch (Chỉ hiển thị khi Awaiting Booking) -->
+              <div class="booking-alert-banner" id="booking-alert-banner" style="display: none;">
+                <div class="alert-info">
+                  <i data-lucide="calendar-days" class="pulse-icon"></i>
+                  <div>
+                    <h4>Khách hàng muốn đặt lịch học!</h4>
+                    <p>AI đã tạm dừng tự động trả lời. Vui lòng tự nhắn tin thống nhất lịch tập luyện.</p>
+                  </div>
+                </div>
+                <button class="btn btn-tennis btn-sm" id="btn-trigger-booking-modal">
+                  <i data-lucide="calendar-check"></i> Xác nhận chốt lịch ngay
+                </button>
+              </div>
+
+              <!-- Thanh điều khiển gửi tin nhắn -->
+              <div class="chat-controls">
+                
+                <!-- Mô phỏng khách hàng (Test Mode) -->
+                <div class="simulation-input-bar">
+                  <span class="sim-badge">Giả lập Khách nhắn</span>
+                  <input type="text" id="sim-message-input" placeholder="Nhập câu hỏi để test chatbot AI (ví dụ: Học phí bao nhiêu?, Sân ở đâu?)...">
+                  <button class="btn btn-secondary" id="btn-send-sim">
+                    <i data-lucide="user"></i> Gửi Test
+                  </button>
+                </div>
+
+                <!-- Input HLV gửi thật -->
+                <div class="hlv-input-bar">
+                  <textarea id="hlv-message-input" rows="1" placeholder="Nhập tin nhắn gửi với tư cách HLV / Trợ lý..."></textarea>
+                  <button class="btn btn-tennis" id="btn-send-manual">
+                    <i data-lucide="send"></i> Gửi tin
+                  </button>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- TAB: SETTINGS -->
+      <section class="tab-panel" id="tab-settings">
+        
+        <div class="settings-grid">
+          
+          <!-- BÊN TRÁI: FAQ & BANNER BÁO GIÁ -->
+          <div class="settings-col glass">
+            <div class="panel-header">
+              <h3><i data-lucide="book-open"></i> FAQ & Trợ lý thông tin</h3>
+              <p>Cấu hình câu trả lời của AI cho các câu hỏi phổ biến.</p>
+            </div>
+            
+            <form id="form-settings-faq" class="settings-form">
+              <div class="form-group">
+                <label for="set-coach-name">Tên huấn luyện viên (hiển thị)</label>
+                <input type="text" id="set-coach-name" required>
+              </div>
+
+              <div class="form-group">
+                <label for="set-greeting">
+                  🇻🇳 Tin nhắn chào mừng (Tiếng Việt)
+                </label>
+                <textarea id="set-greeting" rows="3" required></textarea>
+                <span class="input-hint">Dùng cho khách hàng Zalo và WhatsApp chọn ngôn ngữ Tiếng Việt. Tag: {{name}}, {{coach_name}}</span>
+              </div>
+
+              <div class="form-group">
+                <label for="set-greeting-en">
+                  🇬🇧 Greeting message (English)
+                </label>
+                <textarea id="set-greeting-en" rows="3"></textarea>
+                <span class="input-hint">Used for WhatsApp customers with English language selected. Tags: {{name}}, {{coach_name}}</span>
+              </div>
+
+              <div class="form-group">
+                <label for="set-faq-location">Địa điểm sân dạy học</label>
+                <textarea id="set-faq-location" rows="2" required></textarea>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="set-faq-duration">Thời lượng buổi học</label>
+                  <input type="text" id="set-faq-duration" required>
+                </div>
+                <div class="form-group">
+                  <label for="set-faq-levels">Trình độ & Đối tượng</label>
+                  <input type="text" id="set-faq-levels" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="set-faq-experience">Kinh nghiệm & Chứng chỉ của HLV</label>
+                <textarea id="set-faq-experience" rows="2" required></textarea>
+              </div>
+
+              <div class="form-group">
+                <label for="set-faq-intro">Giới thiệu chung / Phương pháp</label>
+                <textarea id="set-faq-intro" rows="2" required></textarea>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-tennis" id="btn-save-faq">Lưu cài đặt FAQ</button>
+              </div>
+            </form>
+
+            <hr class="divider">
+
+            <!-- Banner báo giá -->
+            <div class="panel-header" style="margin-top: 20px;">
+              <h3><i data-lucide="image"></i> Banner Báo giá & Chi tiết học phí</h3>
+              <p>Ảnh báo giá được gửi đi duy nhất khi khách trực tiếp hỏi học phí. Chọn banner theo ngôn ngữ khách hàng.</p>
+            </div>
+
+            <!-- Banner Tiếng Việt -->
+            <div class="panel-header" style="margin-top: 12px; margin-bottom: 6px;">
+              <h4 style="font-size: 0.9rem; color: var(--color-text-secondary);">🇻🇳 Banner & Học phí (Tiếng Việt)</h4>
+            </div>
+            <div class="pricing-settings-container">
+              <div class="pricing-banner-preview glass">
+                <img id="banner-preview-img-vi" src="" alt="Banner Tiếng Việt" style="display:none;">
+                <div class="banner-no-img" id="banner-no-img-vi">
+                  <i data-lucide="image-off"></i>
+                  <p>Chưa có ảnh banner Tiếng Việt</p>
+                </div>
+              </div>
+              <div class="pricing-upload-actions">
+                <div class="form-group">
+                  <label for="set-pricing-details-vi">Chi tiết học phí Tiếng Việt (AI trả lời)</label>
+                  <textarea id="set-pricing-details-vi" rows="2" placeholder="Ví dụ: 10 buổi 6.5 triệu..."></textarea>
+                </div>
+                <input type="file" id="banner-file-input-vi" accept="image/*" style="display: none;">
+                <button class="btn btn-secondary btn-sm" id="btn-upload-banner-vi">
+                  <i data-lucide="upload"></i> Tải Banner Tiếng Việt
+                </button>
+              </div>
+            </div>
+
+            <!-- Banner Tiếng Anh -->
+            <div class="panel-header" style="margin-top: 20px; margin-bottom: 6px;">
+              <h4 style="font-size: 0.9rem; color: var(--color-text-secondary);">🇬🇧 Banner & Pricing (English / International)</h4>
+            </div>
+            <div class="pricing-settings-container">
+              <div class="pricing-banner-preview glass">
+                <img id="banner-preview-img" src="/uploads/pricing_banner.png" alt="Pricing Banner">
+                <div class="banner-no-img" id="banner-no-img" style="display: none;">
+                  <i data-lucide="image-off"></i>
+                  <p>Chưa có ảnh banner báo giá</p>
+                </div>
+              </div>
+              <div class="pricing-upload-actions">
+                <div class="form-group">
+                  <label for="set-pricing-details">Pricing details in English (AI replies)</label>
+                  <textarea id="set-pricing-details" rows="2" placeholder="e.g. 10 sessions private coaching: 6,500,000 VND..."></textarea>
+                </div>
+                <input type="file" id="banner-file-input" accept="image/*" style="display: none;">
+                <button class="btn btn-secondary btn-sm" id="btn-upload-banner">
+                  <i data-lucide="upload"></i> Upload English Banner
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- BÊN PHẢI: THIẾT LẬP API & GOOGLE SYNC -->
+          <div class="settings-col glass">
+            <div class="panel-header">
+              <h3><i data-lucide="key-round"></i> Khóa kết nối API & Google Sync</h3>
+              <p>Cài đặt kết nối với Google Gemini, Google Calendar và Google Sheets CRM.</p>
+            </div>
+
+            <form id="form-settings-api" class="settings-form">
+              
+              <h4 class="section-title"><i data-lucide="brain"></i> Cấu hình Mô hình AI (Gemini / Groq)</h4>
+              <div class="form-group">
+                <label for="set-gemini-key">Gemini API Key</label>
+                <div class="input-password-wrapper">
+                  <input type="password" id="set-gemini-key" placeholder="AI Studio API Key (bắt đầu bằng AIzaSy...)">
+                  <button type="button" class="btn-toggle-password" id="btn-toggle-gemini-key">
+                    <i data-lucide="eye"></i>
+                  </button>
+                </div>
+                <span class="input-hint">Cấu hình API Key này để chạy mô hình Gemini 2.0 Flash.</span>
+              </div>
+
+              <div class="form-group" style="margin-top: 14px;">
+                <label for="set-groq-key">Groq API Key</label>
+                <div class="input-password-wrapper">
+                  <input type="password" id="set-groq-key" placeholder="Groq API Key (bắt đầu bằng gsk_...)">
+                  <button type="button" class="btn-toggle-password" id="btn-toggle-groq-key">
+                    <i data-lucide="eye"></i>
+                  </button>
+                </div>
+                <span class="input-hint">Có thể dùng thay thế nếu không có Gemini. Sử dụng Llama-3.2-Vision cho OCR và Llama-3.3 cho Chatbot.</span>
+              </div>
+
+              <h4 class="section-title" style="margin-top: 20px;"><i data-lucide="calendar"></i> Google Calendar & Sheets CRM</h4>
+              <div class="form-group">
+                <label for="set-google-sheets-id">Google Sheet CRM ID (Spreadsheet ID)</label>
+                <input type="text" id="set-google-sheets-id" placeholder="ID từ đường dẫn file Google Sheets của bạn">
+              </div>
+              
+              <div class="form-group">
+                <label for="set-google-calendar-id">Google Calendar ID</label>
+                <input type="text" id="set-google-calendar-id" placeholder="Mặc định: primary">
+              </div>
+
+              <div class="form-group">
+                <label for="set-google-email">Service Account Client Email</label>
+                <input type="email" id="set-google-email" placeholder="xxx@project-id.iam.gserviceaccount.com">
+              </div>
+
+              <div class="form-group">
+                <label for="set-google-key">Service Account Private Key</label>
+                <textarea id="set-google-key" rows="4" placeholder="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"></textarea>
+                <span class="input-hint">Nhập toàn bộ Private Key JSON từ Google Cloud Console. Nhớ chia sẻ quyền truy cập Calendar và Sheet của bạn cho Client Email ở trên.</span>
+              </div>
+
+              <h4 class="section-title" style="margin-top: 20px;"><i data-lucide="bell"></i> Thông báo Discord (Discord Webhook)</h4>
+              <div class="form-group">
+                <label for="set-discord-webhook">Discord Webhook URL</label>
+                <input type="text" id="set-discord-webhook" placeholder="Nhập Webhook URL từ Discord Channel của bạn">
+                <span class="input-hint">Nhắc lịch tập tự động qua kênh Discord 15 phút trước giờ học.</span>
+              </div>
+
+              <div class="form-actions">
+                <button type="submit" class="btn btn-tennis" id="btn-save-api">Lưu kết nối API</button>
+              </div>
+            </form>
+
+            <hr class="divider">
+            <div class="panel-header" style="margin-top: 20px;">
+              <h3><i data-lucide="eye-off" class="panel-icon"></i> Quản lý ẩn/hiện</h3>
+              <p>Khôi phục hiển thị cho các khách hàng đã bị xóa mềm khỏi giao diện.</p>
+            </div>
+            <div style="margin-top: 12px;">
+              <button class="btn btn-secondary btn-sm" id="btn-restore-hidden" onclick="restoreHiddenLeads()">
+                <i data-lucide="eye"></i> Khôi phục khách hàng đã ẩn (<span id="hidden-leads-count">0</span>)
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- POPUP MODAL: CHỐT LỊCH HỌC -->
+  <div class="modal-overlay" id="booking-modal">
+    <div class="modal-card glass">
+      <div class="modal-header">
+        <h3><i data-lucide="calendar-check" class="tennis-icon"></i> Xác nhận chốt lịch học tennis</h3>
+        <button class="modal-close" id="btn-close-booking-modal"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <form id="form-confirm-booking">
+          <input type="hidden" id="booking-lead-id">
+          
+          <div class="form-group">
+            <label>Tên học viên</label>
+            <input type="text" id="booking-client-name" readonly class="input-readonly">
+          </div>
+          
+          <div class="form-group">
+            <label>Số điện thoại</label>
+            <input type="text" id="booking-client-phone" readonly class="input-readonly">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="booking-date">Ngày học bắt đầu</label>
+              <input type="date" id="booking-date" required>
+            </div>
+            <div class="form-group">
+              <label for="booking-time">Giờ bắt đầu tập</label>
+              <input type="time" id="booking-time" required>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="booking-duration">Thời lượng buổi học</label>
+              <select id="booking-duration">
+                <option value="60">1 tiếng (60 phút)</option>
+                <option value="90">1.5 tiếng (90 phút)</option>
+                <option value="120" selected>2 tiếng (120 phút)</option>
+                <option value="150">2.5 tiếng (150 phút)</option>
+                <option value="180">3 tiếng (180 phút)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="booking-notes">Ghi chú sự kiện (Sân tập, cấp độ học viên...)</label>
+            <textarea id="booking-notes" rows="2" placeholder="Ví dụ: Tập tại Sân Kỳ Hòa Q10, học viên chưa học bao giờ..."></textarea>
+          </div>
+
+          <div class="alert alert-info">
+            <i data-lucide="info"></i>
+            <p>Sau khi bấm chốt lịch, hệ thống sẽ tự động tạo cuộc hẹn trên Google Calendar và thêm dữ liệu vào Google Sheets CRM của bạn.</p>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary" id="btn-cancel-booking">Hủy bỏ</button>
+            <button type="submit" class="btn btn-tennis" id="btn-save-booking">
+              <i data-lucide="check"></i> Đồng ý &amp; Đồng bộ lịch
+            </button>
+          </div>
+        </form>
+      </div>
+      
+      <!-- Loading khi đồng bộ -->
+      <div class="loading-overlay" id="booking-loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Đang liên kết Google Calendar & CRM Sheets để tạo lịch tập...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio thông báo khi có yêu cầu chốt lịch -->
+  <audio id="notification-sound" src="https://assets.mixkit.co/active_storage/sfx/2869/2869-600.wav" preload="auto"></audio>
+
+  <!-- JS Logic -->
+  <script src="app.js"></script>
+</body>
+</html>

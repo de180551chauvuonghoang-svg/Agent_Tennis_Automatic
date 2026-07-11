@@ -1,0 +1,9 @@
+node_modules/
+database.json
+config.json
+*.json.example
+tennis-agent-*.json
+.env
+.env.*
+.DS_Store
+*.log
