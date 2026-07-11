@@ -946,23 +946,7 @@ function setupChatHandlers() {
     let newStatus = aiToggle.checked ? 'Chatting' : 'Awaiting Booking';
     
     try {
-      // Thực hiện gọi API lưu lại trạng thái mới (chúng ta có thể tận dụng api confirm-booking hoặc tạo api riêng, nhưng đơn giản nhất là đổi status trực tiếp thông qua API config hoặc mock)
-      // Để đơn giản, khi tắt AI ta chuyển trạng thái lead sang Awaiting Booking. Khi bật AI lại ta chuyển sang Chatting.
-      // Chúng ta sẽ ghi trực tiếp lên db bằng một API patch tạm thời
-      const response = await fetch('/api/leads/confirm-booking', { // hoặc thiết kế API đơn giản hơn. Ở đây ta tận dụng database ghi nhận.
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          leadId: activeChatLeadId, 
-          date: lead.bookingDetails?.date || '', 
-          time: lead.bookingDetails?.time || '', 
-          durationMinutes: lead.bookingDetails?.durationMinutes || 120,
-          notes: lead.bookingDetails?.notes || 'HLV đổi trạng thái thủ công',
-          // Backend confirm-booking sẽ set Booked. Nếu chỉ muốn bật tắt AI tạm thời, chúng ta sẽ chỉ update database
-        })
-      });
-      // Đơn giản hơn: ở local ta lưu cấu hình tắt AI tạm thời vào client, hoặc cập nhật trực tiếp lead status
-      // Ta sẽ thiết lập một request nhẹ đến server để cập nhật status:
+      // Cập nhật trạng thái lead lên database
       const updateResponse = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -468,6 +468,11 @@ app.post('/api/chat/simulate-message', async (req, res) => {
 // 4. Xác nhận chốt lịch & đồng bộ Calendar / CRM
 app.post('/api/leads/confirm-booking', async (req, res) => {
   const { leadId, date, time, durationMinutes, notes } = req.body;
+  
+  if (!date || !time) {
+    return res.status(400).json({ error: 'Ngày và giờ học là bắt buộc' });
+  }
+
   const leads = await dbService.getLeads();
   const lead = leads.find(l => l.id === leadId);
 
